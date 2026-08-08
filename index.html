@@ -1,1 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trato Hecho - Escrow Descentralizado</title>
+    <!-- Tailwind CSS para el diseño visual -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ethers.js para comunicación con MetaMask y Blockchain -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-6">
 
+    <div class="max-w-2xl mx-auto p-6 bg-slate-800 rounded-2xl shadow-xl mt-6 border border-slate-700">
+        <!-- Encabezado -->
+        <div class="flex justify-between items-center mb-8 border-b border-slate-700 pb-4">
+            <div>
+                <h1 class="text-2xl font-bold text-emerald-400">Trato Hecho 🤝</h1>
+                <p class="text-xs text-slate-400">Plataforma de garantía segura (Escrow)</p>
+            </div>
+            <button id="btnConnect" onclick="connectWallet()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition">
+                Conectar Billetera
+            </button>
+        </div>
+
+        <!-- Estado de cuenta -->
+        <div class="mb-6 p-3 bg-slate-900 rounded-lg text-sm flex justify-between items-center">
+            <span class="text-slate-400">Estado:</span>
+            <span id="walletStatus" class="text-yellow-400 font-mono">Desconectado</span>
+        </div>
+
+        <!-- Formulario Crear Trato -->
+        <div class="space-y-4">
+            <h2 class="text-lg font-semibold text-slate-200">Crear y Garantizar Trato</h2>
+            
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Dirección del Contrato Escrow</label>
+                <input type="text" id="contractAddress" placeholder="0x..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm font-mono focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">ID del Trato (Bytes32)</label>
+                <input type="text" id="tratoId" value="0x0000000000000000000000000000000000000000000000000000000000000001" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm font-mono focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Dirección del Comprador</label>
+                <input type="text" id="buyerAddress" placeholder="0x..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm font-mono focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Dirección del Token (MockUSDC)</label>
+                <input type="text" id="tokenAddress" placeholder="0x..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm font-mono focus:outline-none focus:border-emerald-500">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Monto de Garantía (Wei / Unidades)</label>
+                    <input type="text" id="amount" value="1000000000000000000" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Plazo (Días)</label>
+                    <input type="number" id="days" value="20" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-sm font-mono focus:outline-none focus:border-emerald-500">
+                </div>
+            </div>
+
+            <button onclick="crearTrato()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-semibold transition mt-4">
+                Bloquear Garantía y Crear Trato
+            </button>
+        </div>
+    </div>
+
+    <!-- Lógica Web3 integrada -->
+    <script>
+        let provider, signer, userAddress;
+
+        // ABIs mínimos para interactuar con los contratos
+        const abiEscrow = [
+            "function crearYGarantizarTrato(bytes32 _tratoId, address _comprador, address _token, uint256 _montoGarantia, uint256 _diasPlazo) external"
+        ];
+
+        async function connectWallet() {
+            if (window.ethereum) {
+                try {
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    await provider.send("eth_requestAccounts", []);
+                    signer = provider.getSigner();
+                    userAddress = await signer.getAddress();
+                    
+                    document.getElementById("walletStatus").innerText = userAddress.substring(0, 6) + "..." + userAddress.substring(38);
+                    document.getElementById("walletStatus").className = "text-emerald-400 font-mono";
+                    document.getElementById("btnConnect").innerText = "Conectado";
+                } catch (error) {
+                    console.error("Error conectando MetaMask:", error);
+                    alert("Error al conectar la billetera de MetaMask.");
+                }
+            } else {
+                alert("No se detectó MetaMask. Instala la extensión en tu navegador.");
+            }
+        }
+
+        async function crearTrato() {
+            if (!signer) {
+                alert("Primero debes conectar tu billetera.");
+                return;
+            }
+
+            const escrowAddr = document.getElementById("contractAddress").value;
+            const tratoId = document.getElementById("tratoId").value;
+            const buyerAddr = document.getElementById("buyerAddress").value;
+            const tokenAddr = document.getElementById("tokenAddress").value;
+            const amount = document.getElementById("amount").value;
+            const days = document.getElementById("days").value;
+
+            if (!escrowAddr || !buyerAddr || !tokenAddr) {
+                alert("Por favor completa las direcciones del contrato, comprador y token.");
+                return;
+            }
+
+            try {
+                const escrowContract = new ethers.Contract(escrowAddr, abiEscrow, signer);
+                
+                // Llamada a la función en la blockchain
+                const tx = await escrowContract.crearYGarantizarTrato(
+                    tratoId,
+                    buyerAddr,
+                    tokenAddr,
+                    amount,
+                    days
+                );
+
+                alert("Transacción enviada. Esperando confirmación en la red...");
+                await tx.wait();
+                alert("¡Trato creado y garantía bloqueada con éxito!");
+            } catch (error) {
+                console.error(error);
+                alert("Ocurrió un error al ejecutar la transacción. Revisa la consola.");
+            }
+        }
+    </script>
+</body>
+</html>
