@@ -138,5 +138,37 @@
             }
         }
     </script>
+    <script>
+  let provider;
+  let signer;
+
+  async function connectWallet() {
+    // 1. Verifica si MetaMask está instalado en el navegador
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        // 2. Le pide a MetaMask que abra la ventana de conexión
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        
+        // 3. Conecta Ethers.js con MetaMask
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        
+        // 4. Obtiene tu dirección de billetera
+        const address = await signer.getAddress();
+        
+        // 5. Actualiza los textos en tu página web
+        document.getElementById('walletStatus').innerText = "Conectado: " + address.substring(0, 6) + "..." + address.substring(38);
+        document.getElementById('walletStatus').classList.remove('text-yellow-400');
+        document.getElementById('walletStatus').classList.add('text-emerald-400');
+        document.getElementById('btnConnect').innerText = "Billetera Conectada";
+        
+      } catch (error) {
+        console.error("Conexión rechazada o error: ", error);
+      }
+    } else {
+      alert("Por favor, instala la extensión MetaMask para usar esta plataforma.");
+    }
+  }
+</script>
 </body>
 </html>
